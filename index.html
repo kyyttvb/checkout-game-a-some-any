@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A / AN / Some Supermarket Game</title>
+    <link rel="icon" href="favicon.png">
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-image: url('background.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        header {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 6px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 30;
+        }
+
+        .score-board {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .sound-btn {
+            background: #4cd137;
+            color: white;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+
+        .sound-btn.muted {
+            background: #ff6b6b;
+        }
+
+        .game-area {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            flex: 1;
+        }
+
+        /* Каса високо зверху */
+        .checkout-banner {
+            position: absolute;
+            top: -7vh;
+            left: -1vw;
+            width: 720px;
+            height: 480px;
+            background-size: contain;
+            background-position: left center;
+            background-repeat: no-repeat;
+            z-index: 5;
+        }
+
+        /* Шар для продуктів на стрічці */
+        #itemsLayer {
+            position: absolute;
+            top: 155px;
+            left: 55px;
+            width: 400px;
+            height: 100px;
+            z-index: 10;
+        }
+
+        .item {
+            position: absolute;
+            width: 115px;
+            height: 115px;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            cursor: grab;
+            transition: transform 0.1s;
+            filter: drop-shadow(0 8px 6px rgba(0,0,0,0.4));
+        }
+
+        .item:active {
+            cursor: grabbing;
+            transform: scale(1.15);
+        }
+
+        /* Кошики підняті вище та зроблені більшими */
+        .baskets-area {
+            position: absolute;
+            bottom: 80px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: space-around;
+            padding: 0 50px;
+            z-index: 20;
+        }
+
+        .basket {
+            width: 320px;
+            height: 240px;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: transform 0.2s, filter 0.2s;
+            filter: drop-shadow(0 12px 10px rgba(0,0,0,0.5));
+        }
+
+        .basket.drag-over {
+            transform: scale(1.1);
+            filter: brightness(1.2) drop-shadow(0 15px 12px rgba(0,0,0,0.6));
+        }
+
+        .feedback-icon {
+            position: absolute;
+            top: -50px;
+            font-size: 50px;
+            font-weight: bold;
+            opacity: 0;
+            transition: opacity 0.3s, transform 0.3s;
+            transform: scale(0.5);
+            z-index: 25;
+        }
+
+        .feedback-icon.show {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .feedback-icon.success {
+            color: #4cd137;
+            text-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        }
+
+        .feedback-icon.error {
+            color: #e84118;
+            text-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        }
+
+        /* Вікно перемоги */
+        #winScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.75);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            color: white;
+            text-align: center;
+        }
+
+        #winScreen h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+            color: #4cd137;
+            text-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+
+        #winScreen p {
+            font-size: 24px;
+            margin-bottom: 30px;
+        }
+
+        #winScreen button {
+            background: #4cd137;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 20px;
+            font-weight: bold;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            transition: background 0.2s;
+        }
+
+        #winScreen button:hover {
+            background: #44bd32;
+        }
+
+        @keyframes popOut {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.3); opacity: 0.7; }
+            100% { transform: scale(0); opacity: 0; }
+        }
+
+        .item.pop {
+            animation: popOut 0.4s forwards;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="score-board">Score: <span id="score">0</span> | Left: <span id="leftCount">22</span> 🛒</div>
+        <button id="soundToggle" class="sound-btn" onclick="toggleBackgroundAudio()">🔊 Sound ON</button>
+    </header>
+
+    <div class="game-area">
+        <audio id="supermarketAudio" loop preload="auto">
+            <source src="supermarket sound.mp3" type="audio/mpeg">
+        </audio>
+
+        <div class="checkout-banner" id="checkoutBanner">
+            <div id="itemsLayer"></div>
+        </div>
+
+        <div class="baskets-area">
+            <div class="basket" id="basket-a" data-category="a" style="background-image: url('baskets/1.png');">
+                <div class="feedback-icon" id="fb-a">✔</div>
+            </div>
+            <div class="basket" id="basket-an" data-category="an" style="background-image: url('baskets/2.png');">
+                <div class="feedback-icon" id="fb-an">✔</div>
+            </div>
+            <div class="basket" id="basket-some" data-category="some" style="background-image: url('baskets/3.png');">
+                <div class="feedback-icon" id="fb-some">✔</div>
+            </div>
+        </div>
+
+        <div id="winScreen">
+            <h1>🎉 Great Job! 🎉</h1>
+            <p>All items successfully sorted!<br>Your final score: <span id="finalScore">0</span></p>
+            <button onclick="restartGame()">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        const cashierFrames = [];
+        for (let i = 1; i <= 27; i++) {
+            const img = new Image();
+            img.src = `checkout motion/${i}.png`;
+            cashierFrames.push(img);
+        }
+
+        const allFoodItems = [];
+        for (let i = 1; i <= 22; i++) {
+            let cat = 'some';
+            if (i >= 1 && i <= 4) cat = 'a';
+            else if (i >= 5 && i <= 7) cat = 'an';
+            else if (i >= 8 && i <= 22) cat = 'some';
+
+            allFoodItems.push({
+                id: i,
+                category: cat,
+                img: `food/${i}.png`
+            });
+        }
+
+        let itemsOnScreen = [];
+        let score = 0;
+        let isAudioPlaying = false;
+        let productQueue = [];
+
+        function initGame() {
+            productQueue = [...allFoodItems].sort(() => Math.random() - 0.5);
+            itemsOnScreen = [];
+            score = 0;
+            document.getElementById('score').textContent = score;
+            document.getElementById('leftCount').textContent = productQueue.length + itemsOnScreen.length;
+            document.getElementById('winScreen').style.display = 'none';
+        }
+
+        initGame();
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const audioElem = document.getElementById('supermarketAudio');
+            audioElem.volume = 0.15;
+            audioElem.play().then(() => {
+                isAudioPlaying = true;
+                const btn = document.getElementById('soundToggle');
+                btn.textContent = '🔊 Sound ON';
+                btn.classList.remove('muted');
+            }).catch(() => {
+                document.body.addEventListener('click', () => {
+                    if (!isAudioPlaying) {
+                        audioElem.play();
+                        isAudioPlaying = true;
+                    }
+                }, { once: true });
+            });
+        });
+
+        function toggleBackgroundAudio() {
+            const audioElem = document.getElementById('supermarketAudio');
+            const btn = document.getElementById('soundToggle');
+            if (isAudioPlaying) {
+                audioElem.pause();
+                isAudioPlaying = false;
+                btn.textContent = '🔇 Sound OFF';
+                btn.classList.add('muted');
+            } else {
+                audioElem.play();
+                isAudioPlaying = true;
+                btn.textContent = '🔊 Sound ON';
+                btn.classList.remove('muted');
+            }
+        }
+
+        let currentFrameIndex = 0;
+        let frameDirection = 1;
+        const bannerElement = document.getElementById('checkoutBanner');
+
+        setInterval(() => {
+            bannerElement.style.backgroundImage = `url('checkout motion/${currentFrameIndex + 1}.png')`;
+            currentFrameIndex += frameDirection;
+            if (currentFrameIndex >= 26) {
+                frameDirection = -1;
+            } else if (currentFrameIndex <= 0) {
+                frameDirection = 1;
+            }
+        }, 800);
+
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            if (type === 'success') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.15);
+                gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.2);
+            } else {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(180, audioCtx.currentTime);
+                osc.frequency.linearRampToValueAtTime(100, audioCtx.currentTime + 0.2);
+                gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.25);
+            }
+        }
+
+        const itemsLayer = document.getElementById('itemsLayer');
+        const STOP_LIMIT = 180;
+        const ITEM_WIDTH = 115;
+
+        function spawnItem() {
+            if (productQueue.length === 0) return;
+
+            const itemData = productQueue.pop();
+            const itemElem = document.createElement('div');
+            itemElem.className = 'item';
+            itemElem.style.backgroundImage = `url('${itemData.img}')`;
+            
+            let posX = -120;
+            itemElem.style.left = posX + 'px';
+            itemsLayer.appendChild(itemElem);
+
+            const itemObj = {
+                element: itemElem,
+                category: itemData.category,
+                data: itemData,
+                x: posX,
+                isDragging: false
+            };
+
+            itemsOnScreen.push(itemObj);
+            updateCounter();
+
+            let shiftX, shiftY;
+
+            function onPointerDown(e) {
+                e.preventDefault();
+                itemObj.isDragging = true;
+                const rect = itemElem.getBoundingClientRect();
+                shiftX = (e.clientX || e.touches[0].clientX) - rect.left;
+                shiftY = (e.clientY || e.touches[0].clientY) - rect.top;
+
+                itemElem.style.zIndex = 100;
+                document.addEventListener('pointermove', onPointerMove);
+                document.addEventListener('pointerup', onPointerUp);
+            }
+
+            function onPointerMove(e) {
+                if (!itemObj.isDragging) return;
+                const clientX = e.clientX || (e.touches ? e.touches[0].clientX : 0);
+                const clientY = e.clientY || (e.touches ? e.touches[0].clientY : 0);
+                
+                itemElem.style.left = (clientX - shiftX - itemsLayer.getBoundingClientRect().left) + 'px';
+                itemElem.style.top = (clientY - shiftY - itemsLayer.getBoundingClientRect().top) + 'px';
+
+                document.querySelectorAll('.basket').forEach(b => {
+                    const rect = b.getBoundingClientRect();
+                    if (clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom) {
+                        b.classList.add('drag-over');
+                    } else {
+                        b.classList.remove('drag-over');
+                    }
+                });
+            }
+
+            function onPointerUp(e) {
+                if (!itemObj.isDragging) return;
+                itemObj.isDragging = false;
+                document.removeEventListener('pointermove', onPointerMove);
+                document.removeEventListener('pointerup', onPointerUp);
+
+                document.querySelectorAll('.basket').forEach(b => b.classList.remove('drag-over'));
+
+                const clientX = e.clientX || (e.changedTouches ? e.changedTouches[0].clientX : 0);
+                const clientY = e.clientY || (e.changedTouches ? e.changedTouches[0].clientY : 0);
+
+                let droppedInBasket = null;
+                document.querySelectorAll('.basket').forEach(b => {
+                    const rect = b.getBoundingClientRect();
+                    if (clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom) {
+                        droppedInBasket = b;
+                    }
+                });
+
+                if (droppedInBasket) {
+                    const targetCategory = droppedInBasket.getAttribute('data-category');
+                    if (targetCategory === itemObj.category) {
+                        playSound('success');
+                        showFeedback(targetCategory, true);
+                        score += 10;
+                        updateScoreBoard();
+
+                        itemElem.classList.add('pop');
+                        setTimeout(() => {
+                            itemElem.remove();
+                            itemsOnScreen = itemsOnScreen.filter(i => i !== itemObj);
+                            updateCounter();
+                            checkWinCondition();
+                        }, 400);
+                    } else {
+                        playSound('error');
+                        showFeedback(targetCategory, false);
+                        updateScoreBoard();
+
+                        itemElem.remove();
+                        itemsOnScreen = itemsOnScreen.filter(i => i !== itemObj);
+                        productQueue.unshift(itemData);
+                        updateCounter();
+                    }
+                } else {
+                    returnToQueue(itemObj);
+                }
+            }
+
+            itemElem.addEventListener('pointerdown', onPointerDown);
+        }
+
+        function returnToQueue(itemObj) {
+            itemObj.x = -120;
+            itemObj.element.style.top = '0px';
+        }
+
+        function showFeedback(category, isSuccess) {
+            const fbElem = document.getElementById(`fb-${category}`);
+            fbElem.textContent = isSuccess ? '✔' : '✖';
+            fbElem.className = `feedback-icon show ${isSuccess ? 'success' : 'error'}`;
+            setTimeout(() => {
+                fbElem.classList.remove('show');
+            }, 800);
+        }
+
+        function updateScoreBoard() {
+            document.getElementById('score').textContent = score;
+        }
+
+        function updateCounter() {
+            document.getElementById('leftCount').textContent = productQueue.length + itemsOnScreen.length;
+        }
+
+        function checkWinCondition() {
+            if (productQueue.length === 0 && itemsOnScreen.length === 0) {
+                document.getElementById('finalScore').textContent = score;
+                document.getElementById('winScreen').style.display = 'flex';
+            }
+        }
+
+        function restartGame() {
+            itemsLayer.innerHTML = '';
+            initGame();
+        }
+
+        function gameLoop() {
+            for (let i = 0; i < itemsOnScreen.length; i++) {
+                let item = itemsOnScreen[i];
+                if (item.isDragging) continue;
+
+                let targetX = STOP_LIMIT - (i * ITEM_WIDTH);
+                if (targetX < -120) targetX = -120;
+
+                if (item.x < targetX) {
+                    item.x += 1.5;
+                    if (item.x > targetX) item.x = targetX;
+                }
+
+                item.element.style.left = item.x + 'px';
+                item.element.style.top = '0px';
+            }
+            requestAnimationFrame(gameLoop);
+        }
+
+        setInterval(() => {
+            if (itemsOnScreen.length < 4 && productQueue.length > 0) {
+                spawnItem();
+            }
+        }, 3000);
+
+        setTimeout(spawnItem, 500);
+        setTimeout(spawnItem, 2500);
+
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
